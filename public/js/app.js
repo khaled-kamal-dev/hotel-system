@@ -214,7 +214,7 @@
     selectedMeal: 'none',
     selectedAddons: {},
     reservationId: null,
-    activeChatId: null,
+    chatOpen: false,
     authRole: 'guest',
     authMode: 'login',
     panel: '',
@@ -329,8 +329,7 @@
     var user = me();
     var links = '';
     if (user && user.role === 'guest') {
-      links = '<button data-go="stays">' + t('myStays') + '</button>' +
-              '<button data-go="chat">' + t('assistant') + '</button>';
+      links = '<button data-go="stays">' + t('myStays') + '</button>';
     } else if (user && user.role === 'receptionist') {
       links = '<button data-go="desk">' + t('desk') + '</button>' +
               '<button data-go="rooms">' + t('rooms') + '</button>' +
@@ -364,7 +363,8 @@
       '<span>' + t('footerNote') + '</span>' +
       '<span>Nile House Luxury Hotel © 2026</span>' +
     '</footer>' +
-    renderBookingModal();
+    renderBookingModal() +
+    renderChatWidget();
   }
 
   function searchForm() {
@@ -757,31 +757,83 @@
     '</section>';
   }
 
-  // View: Chatbot Assistant (Sequence 2)
-  function viewChat() {
+  // Floating Chat Widget (Bottom-right popup)
+  function renderChatWidget() {
+    var user = me();
+    // Do not show widget for staff/receptionists (they manage chats from the messages dashboard)
+    if (user && user.role === 'receptionist') return '';
+
     var history = state.chatHistory || [];
+    var isOpen = state.chatOpen;
+
+    // Floating Button (always visible in bottom right)
+    var fab = '<button class="chat-fab" data-act="toggle-chat" title="' + t('assistant') + '">' +
+      '<span class="chat-fab-icon">' + (isOpen ? '✕' : '💬') + '</span>' +
+    '</button>';
+
+    if (!isOpen) return fab;
+
+    // If user is not signed in yet, show friendly login prompt inside the popup
+    if (!user) {
+      var notLoggedInMsg = state.lang === 'ar'
+        ? '<div class="bubble Bot"><small>🤖 المساعد الذكي</small>مرحباً بك في فندق نايل هاوس! للتحدث مع المساعد الذكي، الاستفسار عن تفاصيل الحجز، أو التحويل للاستقبال، يرجى تسجيل الدخول أولاً.</div>'
+        : '<div class="bubble Bot"><small>🤖 AI Assistant</small>Welcome to Nile House! Please sign in with your guest account to chat with the assistant and get instant answers from our database.</div>';
+
+      var loginBtnLabel = state.lang === 'ar' ? '🧳 تسجيل الدخول أو إنشاء حساب' : '🧳 Sign In or Register';
+
+      return fab + '<div class="chat-popup">' +
+        '<div class="chat-popup-header">' +
+          '<div>' +
+            '<strong>' + t('chatTitle') + '</strong>' +
+            '<small>' + t('chatDesc') + '</small>' +
+          '</div>' +
+          '<button class="chat-popup-close" data-act="toggle-chat">&times;</button>' +
+        '</div>' +
+        '<div class="chat-popup-body">' + notLoggedInMsg + '</div>' +
+        '<div class="chat-popup-footer" style="padding: 16px;">' +
+          '<button class="btn" data-auth-entry="guest" style="width:100%; text-align:center;">' + loginBtnLabel + '</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    // Chat popup panel for logged in guests
+    var welcomeMsg = state.lang === 'ar'
+      ? 'مرحباً بك ' + esc(user.name) + '! أنا مساعد فندق نايل هاوس الذكي. اسألني عن أسعار الغرف، المتاح حالياً، تفاصيل حجزك وفاتورتك، أو مواعيد الوصول وسأجيبك فوراً من قاعدة البيانات.'
+      : 'Hello ' + esc(user.name) + '! I am Nile House\'s AI assistant. Ask me about room rates, availability, your booking and bill, or check-in times and I\'ll answer instantly from the database.';
 
     var bubblesHtml = history.length ? history.map(function (c) {
+      var senderLabel = state.lang === 'ar' ? 'أنت (النزيل)' : 'You (Guest)';
+      var botLabel = c.receptionist_id
+        ? '🏨 ' + (state.lang === 'ar' ? 'موظف الاستقبال' : 'Receptionist') + ' (' + esc(c.receptionist_name || 'Staff') + ')'
+        : '🤖 ' + (state.lang === 'ar' ? 'المساعد الآلي' : 'AI Assistant');
+
       var botBubble = '<div class="bubble ' + (c.receptionist_id ? 'Receptionist' : 'Bot') + '">' +
-        '<small>' + (c.receptionist_id ? '🏨 موظف الاستقبال (' + esc(c.receptionist_name || 'Staff') + ')' : '🤖 المساعد الآلي للفندق') + '</small>' +
+        '<small>' + botLabel + '</small>' +
         esc(c.response) +
       '</div>';
 
-      return '<div class="bubble Guest"><small>أنت (النزيل)</small>' + esc(c.message) + '</div>' + botBubble;
-    }).join('') : '<div class="bubble Bot"><small>🤖 المساعد الآلي للفندق</small>مرحباً بك! أنا مساعد فندق نايل هاوس الذكي. اسألني عن أسعار الغرف وأنواعها، الغرف المتاحة، أو تفاصيل حجزك وسأجيبك فوراً من قاعدة البيانات. وإذا احتجت موظف الاستقبال، سأحولك إليه في أي لحظة.</div>';
+      return '<div class="bubble Guest"><small>' + senderLabel + '</small>' + esc(c.message) + '</div>' + botBubble;
+    }).join('') : '<div class="bubble Bot"><small>🤖 ' + (state.lang === 'ar' ? 'المساعد الآلي' : 'AI Assistant') + '</small>' + welcomeMsg + '</div>';
 
-    return '<section class="section">' +
-      '<h2>' + t('chatTitle') + '</h2>' +
-      '<p class="note">' + t('chatDesc') + '</p>' +
-      '<div class="thread" id="chatThread">' + bubblesHtml + '</div>' +
-      '<form class="composer" data-form="send-chat">' +
-        '<input name="message" placeholder="' + t('chatPlaceholder') + '" required autocomplete="off">' +
-        '<button class="btn" type="submit">' + t('send') + '</button>' +
-      '</form>' +
-      '<div style="margin-top:12px; display:flex; gap:10px;">' +
-        '<button class="btn-line" type="button" data-act="escalate-desk">' + t('askDeskBtn') + '</button>' +
+    var popup = '<div class="chat-popup">' +
+      '<div class="chat-popup-header">' +
+        '<div>' +
+          '<strong>' + t('chatTitle') + '</strong>' +
+          '<small>' + t('chatDesc') + '</small>' +
+        '</div>' +
+        '<button class="chat-popup-close" data-act="toggle-chat">&times;</button>' +
       '</div>' +
-    '</section>';
+      '<div class="chat-popup-body" id="chatThread">' + bubblesHtml + '</div>' +
+      '<div class="chat-popup-footer">' +
+        '<button class="btn-line chat-escalate-btn" type="button" data-act="escalate-desk">' + t('askDeskBtn') + '</button>' +
+        '<form class="chat-popup-composer" data-form="send-chat">' +
+          '<input name="message" placeholder="' + t('chatPlaceholder') + '" required autocomplete="off">' +
+          '<button class="btn" type="submit">' + t('send') + '</button>' +
+        '</form>' +
+      '</div>' +
+    '</div>';
+
+    return fab + popup;
   }
 
   // View: Messages (Receptionist)
@@ -898,7 +950,7 @@
     var user = me();
     var view = state.view;
 
-    if ((view === 'stays' || view === 'chat') && (!user || user.role !== 'guest')) view = 'login';
+    if (view === 'stays' && (!user || user.role !== 'guest')) view = 'login';
     if (view === 'booking' && !user) view = 'login';
     if ((view === 'desk' || view === 'rooms' || view === 'messages') && (!user || user.role !== 'receptionist')) view = 'login';
 
@@ -910,7 +962,6 @@
       : view === 'desk' ? viewDesk()
       : view === 'rooms' ? viewRooms()
       : view === 'messages' ? viewMessages()
-      : view === 'chat' ? viewChat()
       : viewHome();
 
     var appEl = document.getElementById('app');
@@ -918,7 +969,7 @@
       appEl.innerHTML = shell(inner);
     }
 
-    if (view === 'chat') {
+    if (state.chatOpen) {
       var thread = document.getElementById('chatThread');
       if (thread) thread.scrollTop = thread.scrollHeight;
     }
@@ -959,12 +1010,6 @@
         if (rRes.success) state.roomsList = rRes.rooms;
         if (lRes.success) state.roomLogs = lRes.log;
         render();
-      } else if (state.view === 'chat') {
-        var cRes = await API.getChatHistory();
-        if (cRes.success) {
-          state.chatHistory = cRes.history;
-          render();
-        }
       } else if (state.view === 'messages') {
         var mRes = await API.getEscalatedChats();
         if (mRes.success) {
@@ -983,6 +1028,24 @@
     var langBtn = e.target.closest('[data-act="toggle-lang"]');
     if (langBtn) {
       toggleLang();
+      return;
+    }
+
+    // Toggle Floating Chat Widget
+    var toggleChatBtn = e.target.closest('[data-act="toggle-chat"]');
+    if (toggleChatBtn) {
+      state.chatOpen = !state.chatOpen;
+      if (state.chatOpen) {
+        try {
+          var cRes = await API.getChatHistory();
+          if (cRes && cRes.success) {
+            state.chatHistory = cRes.history;
+          }
+        } catch (err) {
+          console.warn('Could not load chat history:', err);
+        }
+      }
+      render();
       return;
     }
 
@@ -1164,7 +1227,11 @@
       try {
         var escRes = await API.escalateChat();
         showNotice(escRes.message);
-        loadViewData();
+        var cRes = await API.getChatHistory();
+        if (cRes && cRes.success) {
+          state.chatHistory = cRes.history;
+          render();
+        }
       } catch (err) {
         showError(err.message);
       }
@@ -1381,8 +1448,12 @@
       var msg = form.message.value;
       form.message.value = '';
       try {
-        await API.sendChatMessage(msg);
-        loadViewData();
+        await API.sendChatMessage(msg, state.lang);
+        var cRes = await API.getChatHistory();
+        if (cRes && cRes.success) {
+          state.chatHistory = cRes.history;
+          render();
+        }
       } catch (err) {
         showError(err.message);
       }

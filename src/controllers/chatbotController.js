@@ -1,8 +1,10 @@
 const { pool } = require('../config/db');
 
 // Helper: Analyze question and query database (Sequence 2 steps 2-5)
-async function analyzeQuestionAndAnswer(message, guestId) {
+// lang parameter: 'ar' for Arabic responses, 'en' for English responses
+async function analyzeQuestionAndAnswer(message, guestId, lang) {
   const text = message.toLowerCase().trim();
+  const isAr = lang === 'ar';
 
   // 1. Check if guest explicitly requests a receptionist / human staff
   const humanKeywords = [
@@ -16,7 +18,9 @@ async function analyzeQuestionAndAnswer(message, guestId) {
     return {
       canAnswer: false,
       escalated: true,
-      response: 'I am transferring your request directly to our front desk receptionist. A team member will reply to you shortly. / تم تحويل استفسارك إلى موظف الاستقبال وسيقوم بالرد عليك في أقرب وقت.'
+      response: isAr
+        ? 'تم تحويل استفسارك مباشرة إلى موظف الاستقبال. سيقوم أحد أعضاء الفريق بالرد عليك في أقرب وقت.'
+        : 'I am transferring your request directly to our front desk receptionist. A team member will reply to you shortly.'
     };
   }
 
@@ -37,12 +41,22 @@ async function analyzeQuestionAndAnswer(message, guestId) {
       );
 
       if (rows.length > 0) {
-        const details = rows.map(r => `${r.type}: EGP ${Number(r.min_price).toFixed(2)}${r.min_price !== r.max_price ? ' - ' + Number(r.max_price).toFixed(2) : ''} per night`).join(' | ');
-        return {
-          canAnswer: true,
-          escalated: false,
-          response: `Our room rates and types from the database: ${details}. All bookings include free high-speed Wi-Fi and complimentary breakfast.`
-        };
+        if (isAr) {
+          const typeNames = { Single: 'فردية', Double: 'مزدوجة', Suite: 'سويت فاخر' };
+          const details = rows.map(r => `${typeNames[r.type] || r.type}: ${Number(r.min_price).toFixed(0)}${r.min_price !== r.max_price ? ' - ' + Number(r.max_price).toFixed(0) : ''} ج.م / ليلة`).join(' | ');
+          return {
+            canAnswer: true,
+            escalated: false,
+            response: `أسعار وأنواع الغرف المتاحة من قاعدة البيانات: ${details}. جميع الحجوزات تشمل واي فاي مجاني عالي السرعة ووجبة إفطار مجانية.`
+          };
+        } else {
+          const details = rows.map(r => `${r.type}: EGP ${Number(r.min_price).toFixed(2)}${r.min_price !== r.max_price ? ' - ' + Number(r.max_price).toFixed(2) : ''} per night`).join(' | ');
+          return {
+            canAnswer: true,
+            escalated: false,
+            response: `Our room rates and types from the database: ${details}. All bookings include free high-speed Wi-Fi and complimentary breakfast.`
+          };
+        }
       }
     } catch (e) {
       console.warn('DB query error in chatbot:', e.message);
@@ -63,17 +77,29 @@ async function analyzeQuestionAndAnswer(message, guestId) {
       );
 
       if (availableRows.length > 0) {
-        const counts = availableRows.map(r => `${r.count} ${r.type}(s)`).join(', ');
-        return {
-          canAnswer: true,
-          escalated: false,
-          response: `Currently, we have available right now: ${counts}. You can search your exact check-in dates on our home page to reserve.`
-        };
+        if (isAr) {
+          const typeNames = { Single: 'فردية', Double: 'مزدوجة', Suite: 'سويت' };
+          const counts = availableRows.map(r => `${r.count} غرفة ${typeNames[r.type] || r.type}`).join('، ');
+          return {
+            canAnswer: true,
+            escalated: false,
+            response: `الغرف المتاحة حالياً: ${counts}. يمكنك البحث بتواريخ إقامتك من الصفحة الرئيسية لحجز غرفتك.`
+          };
+        } else {
+          const counts = availableRows.map(r => `${r.count} ${r.type}(s)`).join(', ');
+          return {
+            canAnswer: true,
+            escalated: false,
+            response: `Currently, we have available right now: ${counts}. You can search your exact check-in dates on our home page to reserve.`
+          };
+        }
       } else {
         return {
           canAnswer: true,
           escalated: false,
-          response: 'All rooms are occupied or being serviced for tonight, but rooms may still be reserved for future dates using the search form!'
+          response: isAr
+            ? 'جميع الغرف مشغولة أو قيد الصيانة حالياً، لكن يمكنك حجز غرفة لتواريخ مستقبلية من خلال نموذج البحث!'
+            : 'All rooms are occupied or being serviced for tonight, but rooms may still be reserved for future dates using the search form!'
         };
       }
     } catch (e) {
@@ -109,16 +135,27 @@ async function analyzeQuestionAndAnswer(message, guestId) {
         const stay = resRows[0];
         const grandTotal = Number((Number(stay.total_price) + Number(stay.service_total)).toFixed(2));
         const balance = Number((grandTotal - Number(stay.amount_paid)).toFixed(2));
-        return {
-          canAnswer: true,
-          escalated: false,
-          response: `Your latest booking is #${stay.reservation_id} for Room ${stay.room_number} (${stay.type}). Dates: ${stay.check_in_date} to ${stay.check_out_date}. Status: [${stay.status}]. Total: EGP ${grandTotal}, Balance due: EGP ${balance > 0 ? balance : 0}.`
-        };
+        const statusNames = { Pending: 'قيد الانتظار', Confirmed: 'مؤكد', 'Checked-In': 'مقيم حالياً', 'Checked-Out': 'غادر', Completed: 'مكتمل', Cancelled: 'ملغي' };
+        if (isAr) {
+          return {
+            canAnswer: true,
+            escalated: false,
+            response: `آخر حجز لك هو رقم #${stay.reservation_id} لغرفة ${stay.room_number} (${stay.type}). التواريخ: ${stay.check_in_date} إلى ${stay.check_out_date}. الحالة: [${statusNames[stay.status] || stay.status}]. الإجمالي: ${grandTotal} ج.م، المتبقي للدفع: ${balance > 0 ? balance : 0} ج.م.`
+          };
+        } else {
+          return {
+            canAnswer: true,
+            escalated: false,
+            response: `Your latest booking is #${stay.reservation_id} for Room ${stay.room_number} (${stay.type}). Dates: ${stay.check_in_date} to ${stay.check_out_date}. Status: [${stay.status}]. Total: EGP ${grandTotal}, Balance due: EGP ${balance > 0 ? balance : 0}.`
+          };
+        }
       } else {
         return {
           canAnswer: true,
           escalated: false,
-          response: 'You do not have any bookings registered under your account yet. You can choose a room and make a reservation anytime!'
+          response: isAr
+            ? 'لا توجد حجوزات مسجلة على حسابك حتى الآن. يمكنك اختيار غرفة وإجراء حجز في أي وقت!'
+            : 'You do not have any bookings registered under your account yet. You can choose a room and make a reservation anytime!'
         };
       }
     } catch (e) {
@@ -131,7 +168,9 @@ async function analyzeQuestionAndAnswer(message, guestId) {
     return {
       canAnswer: true,
       escalated: false,
-      response: 'Standard Check-in time is at 2:00 PM, and Check-out is at 12:00 PM. Early check-in or late check-out can be requested through our front desk receptionist.'
+      response: isAr
+        ? 'موعد تسجيل الوصول (Check-in) الساعة 2:00 ظهراً، وموعد المغادرة (Check-out) الساعة 12:00 ظهراً. يمكن طلب تسجيل وصول مبكر أو مغادرة متأخرة من خلال موظف الاستقبال.'
+        : 'Standard Check-in time is at 2:00 PM, and Check-out is at 12:00 PM. Early check-in or late check-out can be requested through our front desk receptionist.'
     };
   }
 
@@ -139,7 +178,9 @@ async function analyzeQuestionAndAnswer(message, guestId) {
     return {
       canAnswer: true,
       escalated: false,
-      response: 'Room service is available 24 hours a day for checked-in guests! Items include fresh mint tea, fresh juices, club sandwiches, and grill platters.'
+      response: isAr
+        ? 'خدمة الغرف متاحة على مدار 24 ساعة للنزلاء المقيمين! تشمل الأصناف: شاي بالنعناع الطازج، عصائر طبيعية، ساندويتشات كلوب، وأطباق مشويات.'
+        : 'Room service is available 24 hours a day for checked-in guests! Items include fresh mint tea, fresh juices, club sandwiches, and grill platters.'
     };
   }
 
@@ -147,7 +188,9 @@ async function analyzeQuestionAndAnswer(message, guestId) {
     return {
       canAnswer: true,
       escalated: false,
-      response: 'High-speed fiber Wi-Fi is available complimentary throughout Nile House. The network password is provided upon check-in.'
+      response: isAr
+        ? 'واي فاي فائق السرعة متاح مجاناً في جميع أنحاء فندق نايل هاوس. يتم تزويدك بكلمة المرور عند تسجيل الوصول.'
+        : 'High-speed fiber Wi-Fi is available complimentary throughout Nile House. The network password is provided upon check-in.'
     };
   }
 
@@ -156,14 +199,17 @@ async function analyzeQuestionAndAnswer(message, guestId) {
   return {
     canAnswer: false,
     escalated: true,
-    response: 'I could not find an exact automated match for your inquiry in the database. I have transferred this conversation to our front desk receptionist who will reply directly.'
+    response: isAr
+      ? 'لم أتمكن من إيجاد إجابة آلية لاستفسارك في قاعدة البيانات. تم تحويل المحادثة إلى موظف الاستقبال وسيرد عليك مباشرة.'
+      : 'I could not find an exact automated match for your inquiry in the database. I have transferred this conversation to our front desk receptionist who will reply directly.'
   };
 }
 
 // Sequence 2: sendMessage(question)
 async function sendInquiry(req, res) {
-  const { message } = req.body;
+  const { message, lang } = req.body;
   const guestId = req.user ? req.user.userId : null;
+  const chatLang = lang || 'en';
 
   if (!message || !message.trim()) {
     return res.status(400).json({ success: false, message: 'Message cannot be empty.' });
@@ -175,7 +221,7 @@ async function sendInquiry(req, res) {
 
   try {
     // Sequence 2: step 2 analyzeQuestion(), step 3-4 getInfo()
-    const result = await analyzeQuestionAndAnswer(message.trim(), guestId);
+    const result = await analyzeQuestionAndAnswer(message.trim(), guestId, chatLang);
 
     // Insert into `chatbot` table (matches ERD schema)
     const [insertResult] = await pool.query(

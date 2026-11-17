@@ -204,10 +204,10 @@ const API = (function () {
     },
 
     // Chatbot
-    async sendChatMessage(message) {
+    async sendChatMessage(message, lang) {
       return request('/chatbot/message', {
         method: 'POST',
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message, lang })
       });
     },
 

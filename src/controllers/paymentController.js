@@ -1,5 +1,23 @@
 const { pool } = require('../config/db');
 
+// Helper: Luhn Algorithm validator for Credit Cards
+function isValidLuhn(number) {
+  const digits = String(number || '').replace(/\D/g, '');
+  if (digits.length < 13 || digits.length > 19) return false;
+  let sum = 0;
+  let shouldDouble = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let digit = parseInt(digits.charAt(i), 10);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+  return sum % 10 === 0;
+}
+
 // Process a payment for a reservation (Online by guest or at desk by receptionist)
 async function processPayment(req, res) {
   const { reservationId, amount, method, cardInfo } = req.body;
@@ -7,6 +25,16 @@ async function processPayment(req, res) {
 
   if (!reservationId || !amount || amount <= 0) {
     return res.status(400).json({ success: false, message: 'Valid reservation ID and positive amount are required.' });
+  }
+
+  // Validate card if paying online or with credit card
+  if (cardInfo && (method === 'Online' || method === 'Credit Card')) {
+    if (!isValidLuhn(cardInfo)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid credit card number. Failed Luhn checksum validation.'
+      });
+    }
   }
 
   const allowedMethods = ['Cash', 'Credit Card', 'Online'];

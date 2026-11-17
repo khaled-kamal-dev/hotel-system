@@ -95,6 +95,15 @@
       tourGuideOption: "مرشد سياحي خاص لجولة في معالم القاهرة والأهرامات",
       airportOption: "توصيل واستقبال VIP من/إلى المطار",
       spaOption: "جلسة سبا ومساج استرخائي كامل للجسم",
+      paymentMethod: "طريقة الدفع",
+      payOnlineOption: "دفع إلكتروني الآن بالبطاقة (Online Payment)",
+      payDeskOption: "الدفع عند الوصول بالفندق (Pay at Hotel)",
+      cardLabel: "رقم البطاقة الائتمانية",
+      cardPlaceholder: "4242 4242 4242 4242",
+      expiryLabel: "تاريخ الانتهاء",
+      cvvLabel: "رمز الأمان (CVV)",
+      cardValid: "رقم بطاقة صحيح ومؤكد بنجاح",
+      cardInvalid: "رقم بطاقة غير صحيح (تحقق من الأرقام)",
       confirmPayOnline: "💳 تأكيد الحجز ودفع إلكتروني الآن",
       confirmPayDesk: "🏨 تأكيد الحجز والدفع عند الوصول بالفندق",
       close: "إغلاق",
@@ -194,6 +203,15 @@
       tourGuideOption: "Private licensed tour guide for Cairo excursions",
       airportOption: "VIP Airport Pickup & Drop-off Service",
       spaOption: "Full Body Spa & Relaxation Massage Session",
+      paymentMethod: "Payment Method",
+      payOnlineOption: "Pay Online Now with Credit Card",
+      payDeskOption: "Pay Upon Arrival at Hotel Desk",
+      cardLabel: "Credit Card Number",
+      cardPlaceholder: "4242 4242 4242 4242",
+      expiryLabel: "Expiry Date",
+      cvvLabel: "Security Code (CVV)",
+      cardValid: "Valid credit card verified",
+      cardInvalid: "Invalid card number (checksum failed)",
       confirmPayOnline: "💳 Confirm & Pay Online Now",
       confirmPayDesk: "🏨 Confirm & Pay Upon Arrival",
       close: "Close",
@@ -211,7 +229,10 @@
     searchRooms: null,
     selectedRoom: null,
     bookingModalOpen: false,
-    selectedMeal: 'none',
+    modalPayMethod: 'online',
+    cardInput: '',
+    expiryInput: '',
+    cvvInput: '',
     selectedAddons: {},
     reservationId: null,
     chatOpen: false,
@@ -274,6 +295,41 @@
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + days);
     return dateISO(d);
+  }
+
+  // Credit Card Formatter (4 digits followed by space)
+  function formatCardNumber(val) {
+    var digits = String(val || '').replace(/\D/g, '').substring(0, 16);
+    var parts = digits.match(/.{1,4}/g);
+    return parts ? parts.join(' ') : digits;
+  }
+
+  // Luhn Checksum Algorithm Validator
+  function validateLuhn(num) {
+    var digits = String(num || '').replace(/\D/g, '');
+    if (digits.length < 13 || digits.length > 19) return false;
+    var sum = 0;
+    var shouldDouble = false;
+    for (var i = digits.length - 1; i >= 0; i--) {
+      var d = parseInt(digits.charAt(i), 10);
+      if (shouldDouble) {
+        d *= 2;
+        if (d > 9) d -= 9;
+      }
+      sum += d;
+      shouldDouble = !shouldDouble;
+    }
+    return (sum % 10) === 0;
+  }
+
+  // Detect Card Brand (Visa, Mastercard, Amex, Meeza)
+  function detectCardBrand(num) {
+    var clean = String(num || '').replace(/\D/g, '');
+    if (/^4/.test(clean)) return { name: 'Visa', icon: '💳 🟦 Visa' };
+    if (/^(5[1-5]|2[2-7])/.test(clean)) return { name: 'Mastercard', icon: '💳 🟧 Mastercard' };
+    if (/^3[47]/.test(clean)) return { name: 'Amex', icon: '💳 🟩 Amex' };
+    if (/^(5078|9740)/.test(clean)) return { name: 'Meeza', icon: '💳 🇪🇬 ميزة' };
+    return { name: '', icon: '💳' };
   }
 
   function esc(s) {
@@ -588,10 +644,34 @@
 
     var panelHtml = '';
     if (state.panel === 'pay') {
+      var brandObj = detectCardBrand(state.cardInput || '');
+      var isLuhnValid = validateLuhn(state.cardInput || '');
+      var hasCardDigits = (state.cardInput || '').replace(/\D/g, '').length >= 13;
+      var feedbackText = hasCardDigits
+        ? (isLuhnValid ? '✓ ' + (brandObj.name ? brandObj.name + ' - ' : '') + t('cardValid') : '✕ ' + t('cardInvalid'))
+        : '';
+      var feedbackClass = hasCardDigits ? (isLuhnValid ? 'valid' : 'invalid') : '';
+
       panelHtml = '<form class="panel stack" data-form="pay-online">' +
         '<h3>' + t('payOnline') + ' · ' + money(b.balance) + '</h3>' +
-        '<label>رقم البطاقة (Card Number)<input name="card" placeholder="4242 4242 4242 4242" required></label>' +
-        '<button class="btn" type="submit">تأكيد الدفع</button>' +
+        '<div class="card-input-container">' +
+          '<label>' + t('cardLabel') +
+            '<div class="card-input-wrapper">' +
+              '<input name="card" class="card-input" data-mask="card" placeholder="' + t('cardPlaceholder') + '" maxlength="19" value="' + esc(state.cardInput || '') + '" required>' +
+              '<span class="card-brand-badge">' + brandObj.icon + '</span>' +
+            '</div>' +
+            '<div class="card-feedback ' + feedbackClass + '">' + feedbackText + '</div>' +
+          '</label>' +
+          '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:8px;">' +
+            '<label>' + t('expiryLabel') +
+              '<input name="expiry" data-mask="expiry" placeholder="MM/YY" maxlength="5" value="' + esc(state.expiryInput || '') + '" required>' +
+            '</label>' +
+            '<label>' + t('cvvLabel') +
+              '<input name="cvv" data-mask="cvv" placeholder="123" maxlength="4" value="' + esc(state.cvvInput || '') + '" required>' +
+            '</label>' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn" type="submit" style="margin-top:10px;">' + (state.lang === 'ar' ? 'تأكيد ودفع ' : 'Pay Now ') + money(b.balance) + '</button>' +
       '</form>';
     } else if (state.panel === 'modify') {
       panelHtml = '<form class="panel stack" data-form="modify-dates">' +
@@ -929,6 +1009,45 @@
           '</div>' +
         '</div>' +
 
+        '<!-- Payment Method & Credit Card Details -->' +
+        '<div class="addon-group">' +
+          '<div class="addon-title">💳 ' + t('paymentMethod') + '</div>' +
+          '<div class="addon-option">' +
+            '<label><input type="radio" name="modalPayMethod" value="online"' + (state.modalPayMethod !== 'desk' ? ' checked' : '') + ' data-act="change-modal-pay"> 💳 ' + t('payOnlineOption') + '</label>' +
+          '</div>' +
+          '<div class="addon-option">' +
+            '<label><input type="radio" name="modalPayMethod" value="desk"' + (state.modalPayMethod === 'desk' ? ' checked' : '') + ' data-act="change-modal-pay"> 🏨 ' + t('payDeskOption') + '</label>' +
+          '</div>' +
+
+          (state.modalPayMethod !== 'desk' ? (function () {
+            var brandObj = detectCardBrand(state.cardInput || '');
+            var isLuhnValid = validateLuhn(state.cardInput || '');
+            var hasCardDigits = (state.cardInput || '').replace(/\D/g, '').length >= 13;
+            var feedbackText = hasCardDigits
+              ? (isLuhnValid ? '✓ ' + (brandObj.name ? brandObj.name + ' - ' : '') + t('cardValid') : '✕ ' + t('cardInvalid'))
+              : '';
+            var feedbackClass = hasCardDigits ? (isLuhnValid ? 'valid' : 'invalid') : '';
+
+            return '<div class="card-input-container" style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);">' +
+              '<label>' + t('cardLabel') +
+                '<div class="card-input-wrapper">' +
+                  '<input name="modalCard" class="card-input" data-mask="card" placeholder="' + t('cardPlaceholder') + '" maxlength="19" value="' + esc(state.cardInput || '') + '" required autocomplete="off">' +
+                  '<span class="card-brand-badge">' + brandObj.icon + '</span>' +
+                '</div>' +
+                '<div class="card-feedback ' + feedbackClass + '">' + feedbackText + '</div>' +
+              '</label>' +
+              '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:8px;">' +
+                '<label>' + t('expiryLabel') +
+                  '<input name="modalExpiry" data-mask="expiry" placeholder="MM/YY" maxlength="5" value="' + esc(state.expiryInput || '') + '" required>' +
+                '</label>' +
+                '<label>' + t('cvvLabel') +
+                  '<input name="modalCvv" data-mask="cvv" placeholder="123" maxlength="4" value="' + esc(state.cvvInput || '') + '" required>' +
+                '</label>' +
+              '</div>' +
+            '</div>';
+          })() : '') +
+        '</div>' +
+
         '<!-- Total Calculation Bar -->' +
         '<div class="modal-total-bar">' +
           '<span>' + t('total') + ' الإقامة والخدمات:</span>' +
@@ -936,8 +1055,7 @@
         '</div>' +
 
         '<div class="modal-actions">' +
-          '<button class="btn" data-act="confirm-booking" data-pay="online">' + t('confirmPayOnline') + '</button>' +
-          '<button class="btn-line" data-act="confirm-booking" data-pay="desk">' + t('confirmPayDesk') + '</button>' +
+          '<button class="btn" data-act="confirm-booking">' + (state.modalPayMethod === 'desk' ? t('confirmPayDesk') : t('confirmPayOnline')) + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -1118,6 +1236,10 @@
       if (found) {
         state.selectedRoom = found;
         state.selectedAddons = {};
+        state.modalPayMethod = 'online';
+        state.cardInput = '';
+        state.expiryInput = '';
+        state.cvvInput = '';
         state.bookingModalOpen = true;
         render();
       }
@@ -1128,6 +1250,14 @@
     var closeModBtn = e.target.closest('[data-act="close-modal"]');
     if (closeModBtn) {
       state.bookingModalOpen = false;
+      render();
+      return;
+    }
+
+    // Change payment method radio in modal
+    var payMethodRadio = e.target.closest('[data-act="change-modal-pay"]');
+    if (payMethodRadio) {
+      state.modalPayMethod = payMethodRadio.value;
       render();
       return;
     }
@@ -1144,9 +1274,16 @@
     // Confirm booking with customized add-ons
     var confirmBookBtn = e.target.closest('[data-act="confirm-booking"]');
     if (confirmBookBtn) {
-      var payType = confirmBookBtn.dataset.pay;
-      var payOnline = payType === 'online';
+      var payOnline = state.modalPayMethod !== 'desk';
       var r = state.selectedRoom;
+
+      // Validate credit card if paying online
+      if (payOnline) {
+        if (!validateLuhn(state.cardInput || '')) {
+          showError(state.lang === 'ar' ? 'رقم البطاقة الائتمانية غير صالح! يرجى إدخال 16 رقم صحيح مطابق لمعايير الدفع (Luhn Checksum).' : 'Invalid credit card number! Please check your card digits.');
+          return;
+        }
+      }
 
       var addOnsList = [];
       if (state.selectedAddons.jacuzzi) addOnsList.push({ name: '🛁 جاكوزي خاص مجهز (Private Jacuzzi)', price: 300 });
@@ -1161,11 +1298,15 @@
           checkInDate: state.search.checkIn,
           checkOutDate: state.search.checkOut,
           payOnline: payOnline,
+          cardInfo: payOnline ? state.cardInput : null,
           mealPlan: null,
           addOns: addOnsList
         });
 
         state.bookingModalOpen = false;
+        state.cardInput = '';
+        state.expiryInput = '';
+        state.cvvInput = '';
         showNotice(res.message);
         go('booking', { reservationId: res.reservation.reservationId });
       } catch (err) {
@@ -1326,11 +1467,18 @@
     // Pay Online Form
     if (formType === 'pay-online') {
       var card = form.card.value;
+      if (!validateLuhn(card)) {
+        showError(state.lang === 'ar' ? 'رقم البطاقة الائتمانية غير صالح! يرجى إدخال 16 رقم صحيح مطابق لمعايير الدفع (Luhn Checksum).' : 'Invalid credit card number. Please check the digits.');
+        return;
+      }
       var stay = state.currentStay;
       try {
         var payRes = await API.processPayment(stay.reservation_id, stay.bill.balance, 'Online', card);
         showNotice(payRes.message);
         state.panel = '';
+        state.cardInput = '';
+        state.expiryInput = '';
+        state.cvvInput = '';
         loadViewData();
       } catch (err) {
         showError(err.message);
@@ -1456,6 +1604,62 @@
         showError(err.message);
       }
       return;
+    }
+  });
+
+  // Live Input Masking and Credit Card Validation
+  document.addEventListener('input', function (e) {
+    var target = e.target;
+
+    // Credit Card Number Formatting (4 digits grouped by space)
+    if (target.dataset.mask === 'card' || target.name === 'card' || target.name === 'modalCard') {
+      var raw = target.value;
+      var formatted = formatCardNumber(raw);
+      target.value = formatted;
+      state.cardInput = formatted;
+
+      var container = target.closest('.card-input-container') || target.closest('label');
+      if (container) {
+        var badge = container.querySelector('.card-brand-badge');
+        var feedback = container.querySelector('.card-feedback');
+        var brandObj = detectCardBrand(formatted);
+
+        if (badge) badge.textContent = brandObj.icon;
+
+        if (feedback) {
+          var cleanDigits = formatted.replace(/\D/g, '');
+          if (cleanDigits.length >= 13) {
+            var isValid = validateLuhn(formatted);
+            feedback.className = 'card-feedback ' + (isValid ? 'valid' : 'invalid');
+            feedback.textContent = isValid
+              ? '✓ ' + (brandObj.name ? brandObj.name + ' - ' : '') + t('cardValid')
+              : '✕ ' + t('cardInvalid');
+          } else if (cleanDigits.length > 0) {
+            feedback.className = 'card-feedback';
+            feedback.textContent = brandObj.name ? brandObj.name : '';
+          } else {
+            feedback.className = 'card-feedback';
+            feedback.textContent = '';
+          }
+        }
+      }
+    }
+
+    // Expiry Date (MM/YY)
+    if (target.dataset.mask === 'expiry') {
+      var exp = target.value.replace(/\D/g, '').substring(0, 4);
+      if (exp.length >= 2) {
+        target.value = exp.substring(0, 2) + '/' + exp.substring(2);
+      } else {
+        target.value = exp;
+      }
+      state.expiryInput = target.value;
+    }
+
+    // Security Code CVV (3-4 digits max)
+    if (target.dataset.mask === 'cvv') {
+      target.value = target.value.replace(/\D/g, '').substring(0, 4);
+      state.cvvInput = target.value;
     }
   });
 

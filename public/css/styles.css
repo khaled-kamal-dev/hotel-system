@@ -227,6 +227,56 @@ th { color: var(--muted); font-weight: 600; font-size: 0.84rem; text-transform: 
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .modal-close { background: none; border: none; font-size: 1.4rem; color: var(--muted); cursor: pointer; }
 
+/* Credit Card Input & Validation Styling */
+.card-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.card-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.card-input-wrapper input {
+  width: 100%;
+  padding-right: 54px;
+  font-family: 'Courier New', Courier, monospace, var(--sans);
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+[dir="rtl"] .card-input-wrapper input {
+  padding-right: 14px;
+  padding-left: 54px;
+  direction: ltr;
+  text-align: right;
+}
+.card-brand-badge {
+  position: absolute;
+  right: 14px;
+  font-size: 1.25rem;
+  pointer-events: none;
+  user-select: none;
+}
+[dir="rtl"] .card-brand-badge {
+  right: auto;
+  left: 14px;
+}
+.card-feedback {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-height: 18px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+.card-feedback.valid { color: #15803d; }
+.card-feedback.invalid { color: #b91c1c; }
+
 /* All-Inclusive complimentary banner */
 .all-inclusive-banner {
   background: #ecf8f1;

@@ -8,6 +8,24 @@ function calculateNights(inDateStr, outDateStr) {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
+// Helper: Luhn Checksum Validator for Credit Cards
+function isValidLuhn(number) {
+  const digits = String(number || '').replace(/\D/g, '');
+  if (digits.length < 13 || digits.length > 19) return false;
+  let sum = 0;
+  let shouldDouble = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let digit = parseInt(digits.charAt(i), 10);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+  return sum % 10 === 0;
+}
+
 // Sequence 1: Make reservation and optionally pay online (with optional meal plans & add-on services)
 async function createReservation(req, res) {
   const guestId = req.user.userId;
@@ -26,6 +44,16 @@ async function createReservation(req, res) {
       success: false,
       message: 'Check-out date must be at least one day after check-in date.'
     });
+  }
+
+  // Validate credit card if paying online immediately
+  if (payOnline && cardInfo) {
+    if (!isValidLuhn(cardInfo)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid credit card number. Failed Luhn checksum validation.'
+      });
+    }
   }
 
   const connection = await pool.getConnection();

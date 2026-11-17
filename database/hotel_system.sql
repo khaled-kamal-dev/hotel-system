@@ -293,7 +293,7 @@ INSERT INTO `user` (user_id, name, email, password_hash) VALUES
     (6, 'Salma Mahmoud', 'salma@hotel.com',         '$2b$10$kL8mN9o0p1q2r3s4t5u6v7w8x9y0z1a2b3c4d5e6f7g8h9i0j1k2l'),
     (8, 'Yasmine Tarek', 'yasmine@example.com',     '$2b$10$rC2bQ2xQ2zD0w6F8z5gDiuW5tB5xU4F5n8o9p0q1r2s3t4u5v6w7x'),
     (9, 'Tamer Hosny',   'tamer@example.com',       '$2b$10$rC2bQ2xQ2zD0w6F8z5gDiuW5tB5xU4F5n8o9p0q1r2s3t4u5v6w7x'),
-    (10, 'Khaled Kamal', 'khaled.kamal@hotel.com',  '$2b$10$i2c49Y5cQe7f1K4k4a/3sux8oXvB0y3ZcNuUdfvK6dI4fUa7L7uW2');
+    (10, 'Khaled Kamal', 'khaled.kamal@hotel.com',  '$2a$10$by0MXYg4azohZcLCTSz/Xu3VNDhtgjDLbUJ/zMDIBe40xbrmD1f.a');
 
 INSERT INTO guest (user_id, phone) VALUES
     (1, '01001234567'),

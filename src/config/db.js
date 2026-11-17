@@ -11,7 +11,10 @@ const pool = mysql.createPool({
   connectionLimit: 15,
   queueLimit: 0,
   decimalNumbers: true,
-  timezone: 'Z'
+  timezone: 'Z',
+  // Managed MySQL services such as TiDB Cloud require encrypted connections.
+  // Leave this disabled locally unless DB_SSL=true is set in the environment.
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : undefined
 });
 
 // Test connection helper

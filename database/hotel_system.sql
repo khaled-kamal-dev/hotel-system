@@ -236,48 +236,8 @@ CREATE TABLE chatbot (
         ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE = InnoDB;
 
--- =====================================================================
--- Triggers: Prevent overlapping bookings for active reservations
--- (Pending, Confirmed, Checked-In)
--- =====================================================================
-DELIMITER $$
-
-CREATE TRIGGER trg_reservation_no_overlap_insert
-BEFORE INSERT ON reservation
-FOR EACH ROW
-BEGIN
-    IF NEW.status IN ('Pending', 'Confirmed', 'Checked-In') AND EXISTS (
-        SELECT 1
-        FROM reservation r
-        WHERE r.room_id = NEW.room_id
-          AND r.status IN ('Pending', 'Confirmed', 'Checked-In')
-          AND r.check_in_date < NEW.check_out_date
-          AND NEW.check_in_date < r.check_out_date
-    ) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Room is already booked for those dates';
-    END IF;
-END$$
-
-CREATE TRIGGER trg_reservation_no_overlap_update
-BEFORE UPDATE ON reservation
-FOR EACH ROW
-BEGIN
-    IF NEW.status IN ('Pending', 'Confirmed', 'Checked-In') AND EXISTS (
-        SELECT 1
-        FROM reservation r
-        WHERE r.room_id = NEW.room_id
-          AND r.reservation_id <> NEW.reservation_id
-          AND r.status IN ('Pending', 'Confirmed', 'Checked-In')
-          AND r.check_in_date < NEW.check_out_date
-          AND NEW.check_in_date < r.check_out_date
-    ) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Room is already booked for those dates';
-    END IF;
-END$$
-
-DELIMITER ;
+-- Reservation date overlap validation is enforced by the application.
+-- TiDB Cloud Starter does not support MySQL triggers.
 
 -- =====================================================================
 -- Views: From Use Case Diagram

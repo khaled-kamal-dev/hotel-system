@@ -47,14 +47,14 @@ async function analyzeQuestionAndAnswer(message, guestId, lang) {
           return {
             canAnswer: true,
             escalated: false,
-            response: `أسعار وأنواع الغرف المتاحة من قاعدة البيانات: ${details}. جميع الحجوزات تشمل واي فاي مجاني عالي السرعة ووجبة إفطار مجانية.`
+            response: `أسعار وأنواع الغرف المتاحة من قاعدة البيانات: ${details}. جميع الحجوزات تشمل إقامة كاملة بجميع الوجبات مجاناً (إفطار، غداء، وعشاء) وواي فاي فائق السرعة.`
           };
         } else {
           const details = rows.map(r => `${r.type}: EGP ${Number(r.min_price).toFixed(2)}${r.min_price !== r.max_price ? ' - ' + Number(r.max_price).toFixed(2) : ''} per night`).join(' | ');
           return {
             canAnswer: true,
             escalated: false,
-            response: `Our room rates and types from the database: ${details}. All bookings include free high-speed Wi-Fi and complimentary breakfast.`
+            response: `Our room rates and types from the database: ${details}. All bookings include complimentary full board meals (breakfast, lunch & dinner) and free high-speed Wi-Fi.`
           };
         }
       }

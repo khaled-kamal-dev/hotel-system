@@ -86,15 +86,15 @@
       replyToGuest: "الرد على النزيل",
       typeYourReply: "اكتب ردك للنزيل كموظف استقبال...",
       sendReply: "إرسال الرد",
-      customizeStay: "تخصيص إقامتك وخدمات الغرفة",
-      mealPlanTitle: "🍽️ اختيار نظام الوجبات (Meal Plan)",
-      roomOnly: "إقامة فقط بدون وجبات",
-      breakfastIncluded: "شامل وجبة الإفطار يومياً",
-      halfBoard: "شامل إفطار وغداء يومياً (Half Board)",
+      customizeStay: "تخصيص إقامتك والخدمات الإضافية",
+      allInclusiveTitle: "إقامة كاملة شاملة جميع الوجبات (All-Inclusive)",
+      allInclusiveNote: "جميع الوجبات اليومية (إفطار، غداء، عشاء بوفيه مفتوح) مشمولة مجاناً في سعر الغرفة.",
       amenitiesTitle: "✨ خدمات ورفاهيات إضافية (Add-ons)",
       jacuzziOption: "جاكوزي خاص مجهز داخل الغرفة",
-      sonyOption: "جهاز بلايستيشن / سوني مع ألعاب في الغرفة",
-      tourGuideOption: "مرشد سياحي خاص لجولة في معالم القاهرة",
+      sonyOption: "جهاز بلايستيشن 5 مع ألعاب في الغرفة",
+      tourGuideOption: "مرشد سياحي خاص لجولة في معالم القاهرة والأهرامات",
+      airportOption: "توصيل واستقبال VIP من/إلى المطار",
+      spaOption: "جلسة سبا ومساج استرخائي كامل للجسم",
       confirmPayOnline: "💳 تأكيد الحجز ودفع إلكتروني الآن",
       confirmPayDesk: "🏨 تأكيد الحجز والدفع عند الوصول بالفندق",
       close: "إغلاق",
@@ -186,14 +186,14 @@
       typeYourReply: "Type your message as receptionist...",
       sendReply: "Send Reply",
       customizeStay: "Customize Your Stay & Services",
-      mealPlanTitle: "🍽️ Choose Meal Plan",
-      roomOnly: "Room accommodation only",
-      breakfastIncluded: "Complimentary breakfast included daily",
-      halfBoard: "Breakfast and lunch included daily (Half Board)",
+      allInclusiveTitle: "Full Board All-Inclusive Stay",
+      allInclusiveNote: "Complimentary daily breakfast, lunch, and dinner buffet included with your room rate.",
       amenitiesTitle: "✨ Extra Amenities & Services (Add-ons)",
       jacuzziOption: "Private Jacuzzi setup in room",
       sonyOption: "Sony PlayStation console in room with games",
       tourGuideOption: "Private licensed tour guide for Cairo excursions",
+      airportOption: "VIP Airport Pickup & Drop-off Service",
+      spaOption: "Full Body Spa & Relaxation Massage Session",
       confirmPayOnline: "💳 Confirm & Pay Online Now",
       confirmPayDesk: "🏨 Confirm & Pay Upon Arrival",
       close: "Close",
@@ -870,24 +870,22 @@
     '</section>';
   }
 
-  // Booking Modal with Add-ons (Meal Plan, Jacuzzi, Sony Console, Tour Guide)
+  // Booking Modal with Add-ons (Jacuzzi, Sony Console, Tour Guide, Airport VIP, Full Body Spa)
   function renderBookingModal() {
     if (!state.bookingModalOpen || !state.selectedRoom) return '';
     var r = state.selectedRoom;
     var nights = r.nights || 1;
     var baseRoomCost = r.totalStayPrice || (r.price_per_night * nights);
 
-    // Calculate Meal Cost
-    var mealPricePerNight = state.selectedMeal === 'breakfast' ? 100 : (state.selectedMeal === 'halfboard' ? 250 : 0);
-    var mealTotal = mealPricePerNight * nights;
-
     // Calculate Add-on Amenities Cost
     var addonsTotal = 0;
     if (state.selectedAddons.jacuzzi) addonsTotal += 300;
     if (state.selectedAddons.sony) addonsTotal += 200;
     if (state.selectedAddons.tour) addonsTotal += 500;
+    if (state.selectedAddons.airport) addonsTotal += 350;
+    if (state.selectedAddons.spa) addonsTotal += 450;
 
-    var grandTotal = baseRoomCost + mealTotal + addonsTotal;
+    var grandTotal = baseRoomCost + addonsTotal;
 
     return '<div class="modal-backdrop">' +
       '<div class="modal-box">' +
@@ -897,20 +895,12 @@
         '</div>' +
         '<p class="note"><strong>' + esc(r.type) + ' #' + esc(r.room_number) + '</strong> (' + esc(state.search.checkIn) + ' → ' + esc(state.search.checkOut) + ' · ' + nights + ' ' + (nights > 1 ? t('nights') : t('night')) + ')</p>' +
 
-        '<!-- Meal Plan Selection -->' +
-        '<div class="addon-group">' +
-          '<div class="addon-title">' + t('mealPlanTitle') + '</div>' +
-          '<div class="addon-option">' +
-            '<label><input type="radio" name="mealChoice" value="none"' + (state.selectedMeal === 'none' ? ' checked' : '') + ' data-act="change-meal"> ' + t('roomOnly') + '</label>' +
-            '<span class="addon-price">0 ' + t('egp') + '</span>' +
-          '</div>' +
-          '<div class="addon-option">' +
-            '<label><input type="radio" name="mealChoice" value="breakfast"' + (state.selectedMeal === 'breakfast' ? ' checked' : '') + ' data-act="change-meal"> ' + t('breakfastIncluded') + '</label>' +
-            '<span class="addon-price">+100 ' + t('egp') + ' / ' + t('night') + '</span>' +
-          '</div>' +
-          '<div class="addon-option">' +
-            '<label><input type="radio" name="mealChoice" value="halfboard"' + (state.selectedMeal === 'halfboard' ? ' checked' : '') + ' data-act="change-meal"> ' + t('halfBoard') + '</label>' +
-            '<span class="addon-price">+250 ' + t('egp') + ' / ' + t('night') + '</span>' +
+        '<!-- All-Inclusive Included Meals Highlight -->' +
+        '<div class="all-inclusive-banner">' +
+          '<span class="ai-icon">🍽️</span>' +
+          '<div>' +
+            '<strong>' + t('allInclusiveTitle') + '</strong>' +
+            '<span>' + t('allInclusiveNote') + '</span>' +
           '</div>' +
         '</div>' +
 
@@ -928,6 +918,14 @@
           '<div class="addon-option">' +
             '<label><input type="checkbox" name="addon_tour"' + (state.selectedAddons.tour ? ' checked' : '') + ' data-act="toggle-addon" data-key="tour"> 🏛️ ' + t('tourGuideOption') + '</label>' +
             '<span class="addon-price">+500 ' + t('egp') + '</span>' +
+          '</div>' +
+          '<div class="addon-option">' +
+            '<label><input type="checkbox" name="addon_airport"' + (state.selectedAddons.airport ? ' checked' : '') + ' data-act="toggle-addon" data-key="airport"> 🚗 ' + t('airportOption') + '</label>' +
+            '<span class="addon-price">+350 ' + t('egp') + '</span>' +
+          '</div>' +
+          '<div class="addon-option">' +
+            '<label><input type="checkbox" name="addon_spa"' + (state.selectedAddons.spa ? ' checked' : '') + ' data-act="toggle-addon" data-key="spa"> 💆 ' + t('spaOption') + '</label>' +
+            '<span class="addon-price">+450 ' + t('egp') + '</span>' +
           '</div>' +
         '</div>' +
 
@@ -1119,7 +1117,6 @@
       var found = (state.searchRooms || []).find(function (r) { return r.room_id === rId; });
       if (found) {
         state.selectedRoom = found;
-        state.selectedMeal = 'none';
         state.selectedAddons = {};
         state.bookingModalOpen = true;
         render();
@@ -1131,14 +1128,6 @@
     var closeModBtn = e.target.closest('[data-act="close-modal"]');
     if (closeModBtn) {
       state.bookingModalOpen = false;
-      render();
-      return;
-    }
-
-    // Change meal choice in modal
-    var mealRadio = e.target.closest('[data-act="change-meal"]');
-    if (mealRadio) {
-      state.selectedMeal = mealRadio.value;
       render();
       return;
     }
@@ -1159,17 +1148,12 @@
       var payOnline = payType === 'online';
       var r = state.selectedRoom;
 
-      var mealPlanObj = null;
-      if (state.selectedMeal === 'breakfast') {
-        mealPlanObj = { name: 'شامل الإفطار يومياً (Daily Breakfast)', price: 100, perNight: true };
-      } else if (state.selectedMeal === 'halfboard') {
-        mealPlanObj = { name: 'إقامة نصف شاملة إفطار وغداء (Half Board)', price: 250, perNight: true };
-      }
-
       var addOnsList = [];
       if (state.selectedAddons.jacuzzi) addOnsList.push({ name: '🛁 جاكوزي خاص مجهز (Private Jacuzzi)', price: 300 });
-      if (state.selectedAddons.sony) addOnsList.push({ name: '🎮 جهاز بلايستيشن / سوني (Sony PlayStation)', price: 200 });
+      if (state.selectedAddons.sony) addOnsList.push({ name: '🎮 جهاز بلايستيشن 5 (PlayStation 5)', price: 200 });
       if (state.selectedAddons.tour) addOnsList.push({ name: '🏛️ مرشد سياحي خاص (Private Tour Guide)', price: 500 });
+      if (state.selectedAddons.airport) addOnsList.push({ name: '🚗 توصيل واستقبال VIP المطار (Airport VIP)', price: 350 });
+      if (state.selectedAddons.spa) addOnsList.push({ name: '💆 جلسة سبا ومساج استرخائي (Spa & Massage)', price: 450 });
 
       try {
         var res = await API.createReservation({
@@ -1177,7 +1161,7 @@
           checkInDate: state.search.checkIn,
           checkOutDate: state.search.checkOut,
           payOnline: payOnline,
-          mealPlan: mealPlanObj,
+          mealPlan: null,
           addOns: addOnsList
         });
 

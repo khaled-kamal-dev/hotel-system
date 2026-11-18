@@ -100,11 +100,13 @@ async function createReservation(req, res) {
     const reservationId = resResult.insertId;
 
     // 5) Handle Add-ons & Meal plans as Room Service order (each add-on inserted individually so it can be cancelled individually)
+    const selectedItemsList = [];
     let addOnsTotal = 0;
 
     if (mealPlan && mealPlan.name && Number(mealPlan.price) > 0) {
       const mealCost = Number(mealPlan.price) * (mealPlan.perNight ? nights : 1);
       addOnsTotal += mealCost;
+      selectedItemsList.push(`${mealPlan.name} (EGP ${mealCost})`);
       await connection.query(
         `INSERT INTO room_service_order (reservation_id, items, total_price, status, ordered_at)
          VALUES (?, ?, ?, 'Placed', NOW())`,
@@ -117,6 +119,7 @@ async function createReservation(req, res) {
         const p = Number(item.price) || 0;
         if (p > 0 && item.name) {
           addOnsTotal += p;
+          selectedItemsList.push(`${item.name} (EGP ${p})`);
           await connection.query(
             `INSERT INTO room_service_order (reservation_id, items, total_price, status, ordered_at)
              VALUES (?, ?, ?, 'Placed', NOW())`,

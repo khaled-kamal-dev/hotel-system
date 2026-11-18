@@ -1096,18 +1096,20 @@
             var isLuhnValid = validateLuhn(state.cardInput || '');
             var hasCardDigits = (state.cardInput || '').replace(/\D/g, '').length >= 13;
             var feedbackText = hasCardDigits
-              ? (isLuhnValid ? '✓ ' + (brandObj.name ? brandObj.name + ' - ' : '') + t('cardValid') : '✕ ' + t('cardInvalid'))
-              : '';
-            var feedbackClass = hasCardDigits ? (isLuhnValid ? 'valid' : 'invalid') : '';
+              ? (isLuhnValid ? '✓ ' + (brandObj.name ? brandObj.name + ' - ' : '') + t('cardValid') : '✕ ' + t('cardInvalid') + ' (جرّب 4242 4242 4242 4242)')
+              : (state.lang === 'ar' ? 'ℹ️ بطاقة اختبار تجريبية: 4242 4242 4242 4242' : 'ℹ️ Demo card: 4242 4242 4242 4242');
+            var feedbackClass = hasCardDigits ? (isLuhnValid ? 'valid' : 'invalid') : 'note';
 
             return '<div class="card-input-container" style="margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);">' +
-              '<label>' + t('cardLabel') +
-                '<div class="card-input-wrapper">' +
-                  '<input name="modalCard" class="card-input" data-mask="card" placeholder="' + t('cardPlaceholder') + '" maxlength="19" value="' + esc(state.cardInput || '') + '" required autocomplete="off">' +
-                  '<span class="card-brand-badge">' + brandObj.icon + '</span>' +
-                '</div>' +
-                '<div class="card-feedback ' + feedbackClass + '">' + feedbackText + '</div>' +
-              '</label>' +
+              '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">' +
+                '<label style="margin:0; font-weight:600;">' + t('cardLabel') + '</label>' +
+                '<button type="button" class="btn-line" data-act="fill-demo-card" style="font-size:0.75rem; padding:3px 8px; border-radius:6px; cursor:pointer;">💳 ' + (state.lang === 'ar' ? 'تعبئة بطاقة تجريبية (4242)' : 'Fill Demo Card') + '</button>' +
+              '</div>' +
+              '<div class="card-input-wrapper">' +
+                '<input name="modalCard" class="card-input" data-mask="card" placeholder="' + t('cardPlaceholder') + '" maxlength="19" value="' + esc(state.cardInput || '') + '" required autocomplete="off">' +
+                '<span class="card-brand-badge">' + brandObj.icon + '</span>' +
+              '</div>' +
+              '<div class="card-feedback ' + feedbackClass + '">' + feedbackText + '</div>' +
               '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:8px;">' +
                 '<label>' + t('expiryLabel') +
                   '<input name="modalExpiry" data-mask="expiry" placeholder="MM/YY" maxlength="5" value="' + esc(state.expiryInput || '') + '" required>' +
@@ -1339,6 +1341,16 @@
     if (addonCheck) {
       var key = addonCheck.dataset.key;
       state.selectedAddons[key] = addonCheck.checked;
+      render();
+      return;
+    }
+
+    // Fill Demo Test Card
+    var fillDemoBtn = e.target.closest('[data-act="fill-demo-card"]');
+    if (fillDemoBtn) {
+      state.cardInput = '4242 4242 4242 4242';
+      state.expiryInput = '12/28';
+      state.cvvInput = '123';
       render();
       return;
     }

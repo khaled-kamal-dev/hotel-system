@@ -66,6 +66,23 @@ async function placeOrder(req, res) {
       });
     }
 
+    if (Array.isArray(items) && items.length > 0 && typeof items[0] === 'object' && items[0].name) {
+      const createdOrders = [];
+      for (const it of items) {
+        const itemPrice = Number(it.price) > 0 ? Number(it.price) : 0;
+        const [result] = await pool.query(
+          'INSERT INTO room_service_order (reservation_id, items, total_price, status, ordered_at) VALUES (?, ?, ?, ?, NOW())',
+          [reservationId, it.name, itemPrice, 'Placed']
+        );
+        createdOrders.push({ orderId: result.insertId, items: it.name, totalPrice: itemPrice, status: 'Placed' });
+      }
+      return res.status(201).json({
+        success: true,
+        message: 'Room service order placed successfully.',
+        orders: createdOrders
+      });
+    }
+
     const orderPrice = Number(totalPrice) > 0 ? Number(totalPrice) : 0;
     const itemsDescription = Array.isArray(items) ? items.join(', ') : String(items);
 
@@ -121,8 +138,88 @@ async function updateOrderStatus(req, res) {
   }
 }
 
+// Cancel a single item from an order that contains multiple items
+async function cancelOrderItem(req, res) {
+  const { id } = req.params;
+  const { itemIndex } = req.body;
+  const user = req.user;
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT o.*, r.guest_id 
+       FROM room_service_order o 
+       JOIN reservation r ON r.reservation_id = o.reservation_id 
+       WHERE o.order_id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found.' });
+    }
+
+    const order = rows[0];
+    if (user.role === 'guest' && order.guest_id !== user.userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized for this order.' });
+    }
+
+    if (order.status !== 'Placed') {
+      return res.status(400).json({ success: false, message: 'Only orders with status "Placed" can be cancelled.' });
+    }
+
+    // Split items by comma (avoiding split within parentheses)
+    const itemsList = order.items.split(/,\s*(?=[^)]*(?:\(|$))/).map(s => s.trim()).filter(Boolean);
+
+    if (itemsList.length <= 1) {
+      await pool.query('UPDATE room_service_order SET status = "Cancelled" WHERE order_id = ?', [id]);
+      return res.json({
+        success: true,
+        message: 'Order cancelled successfully.',
+        orderId: Number(id),
+        status: 'Cancelled'
+      });
+    }
+
+    const idx = (Number(itemIndex) >= 0 && Number(itemIndex) < itemsList.length) ? Number(itemIndex) : 0;
+    const removedItem = itemsList.splice(idx, 1)[0];
+
+    // Detect price from removedItem
+    let removedPrice = 0;
+    const priceMatch = removedItem.match(/\((?:EGP\s*)?(\d+(?:\.\d+)?)\)/i) || removedItem.match(/(\d+(?:\.\d+)?)\s*(?:EGP|ج\.م)/i);
+    if (priceMatch) {
+      removedPrice = parseFloat(priceMatch[1]);
+    } else {
+      removedPrice = Number((Number(order.total_price) / (itemsList.length + 1)).toFixed(2));
+    }
+
+    const newTotalPrice = Math.max(0, Number((Number(order.total_price) - removedPrice).toFixed(2)));
+
+    // Update the existing order with remaining items
+    await pool.query(
+      'UPDATE room_service_order SET items = ?, total_price = ? WHERE order_id = ?',
+      [itemsList.join(', '), newTotalPrice, id]
+    );
+
+    // Insert a separate Cancelled row for the removed item
+    await pool.query(
+      'INSERT INTO room_service_order (reservation_id, items, total_price, status, ordered_at) VALUES (?, ?, ?, "Cancelled", NOW())',
+      [order.reservation_id, removedItem, removedPrice]
+    );
+
+    res.json({
+      success: true,
+      message: 'Item cancelled successfully.',
+      cancelledItem: removedItem,
+      remainingCount: itemsList.length
+    });
+  } catch (err) {
+    console.error('cancelOrderItem error:', err);
+    res.status(500).json({ success: false, message: 'Server error cancelling item.' });
+  }
+}
+
 module.exports = {
   getMenu,
   placeOrder,
-  updateOrderStatus
+  updateOrderStatus,
+  cancelOrderItem
 };

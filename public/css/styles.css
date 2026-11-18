@@ -160,7 +160,29 @@ textarea { min-height: 90px; resize: vertical; }
 [dir="rtl"] .swatch-badge { right: auto; left: 10px; }
 
 .card h3 { font-size: 1.45rem; margin-top: 4px; }
-.meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); margin: 8px 0 12px; }
+.meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); margin: 8px 0 10px; }
+.card-desc {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 6px 0 10px;
+}
+.room-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.room-tag {
+  font-size: 0.74rem;
+  padding: 3px 8px;
+  background: rgba(30, 58, 47, 0.07);
+  color: var(--pine);
+  border-radius: 999px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
 .row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 
 .pill {
@@ -276,6 +298,49 @@ th { color: var(--muted); font-weight: 600; font-size: 0.84rem; text-transform: 
 }
 .card-feedback.valid { color: #15803d; }
 .card-feedback.invalid { color: #b91c1c; }
+
+/* Password Visibility Toggle */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.password-wrapper input {
+  width: 100%;
+  padding-right: 44px;
+}
+[dir="rtl"] .password-wrapper input {
+  padding-right: 14px;
+  padding-left: 44px;
+}
+.password-toggle-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--muted);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.password-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  transform: translateY(-50%) scale(1.1);
+}
+[dir="rtl"] .password-toggle-btn {
+  right: auto;
+  left: 10px;
+}
 
 /* All-Inclusive complimentary banner */
 .all-inclusive-banner {

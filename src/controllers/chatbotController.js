@@ -24,7 +24,46 @@ async function analyzeQuestionAndAnswer(message, guestId, lang) {
     };
   }
 
-  // 2. Query DB: Room types and prices
+  // 2. Add-ons, Amenities & Extra Services
+  if (
+    text.includes('اضافات') || text.includes('إضافات') || text.includes('خدمات') || text.includes('سبا') || 
+    text.includes('مساج') || text.includes('جاكوزي') || text.includes('بلايستيشن') || text.includes('مطار') || 
+    text.includes('مرشد') || text.includes('وجبات') || text.includes('طعام') || text.includes('اكل') ||
+    text.includes('spa') || text.includes('massage') || text.includes('jacuzzi') || text.includes('playstation') || 
+    text.includes('airport') || text.includes('addons') || text.includes('amenities') || text.includes('meal')
+  ) {
+    if (isAr) {
+      return {
+        canAnswer: true,
+        escalated: false,
+        response: 
+`✨ قائمة الخدمات والإضافات المتوفرة في فندق نايل هاوس:
+🍽️ إقامة كاملة (All-Inclusive): جميع الوجبات اليومية (إفطار، غداء، عشاء بوفيه مفتوح) مشمولة مجاناً في سعر الحجز!
+🚗 توصيل واستقبال VIP المطار: +350 ج.م
+💆 جلسة سبا ومساج استرخائي كامل للجسم: +450 ج.م
+🛁 تجهيز جاكوزي خاص فاخر داخل الغرفة: +300 ج.م
+🎮 جهاز بلايستيشن 5 مع ألعاب في الغرفة: +200 ج.م
+🏛️ مرشد سياحي مرخص لجولة معالم القاهرة والأهرامات: +500 ج.م
+كما تتوفر خدمة غرف 24 ساعة للمأكولات والمشروبات الخفيفة من صفحة الحجز.`
+      };
+    } else {
+      return {
+        canAnswer: true,
+        escalated: false,
+        response: 
+`✨ Available Extra Services & Amenities at Nile House:
+🍽️ Full Board All-Inclusive: Complimentary daily breakfast, lunch, and dinner buffet included in your room rate!
+🚗 VIP Airport Pickup & Drop-off: +EGP 350
+💆 Full Body Relaxation Spa & Massage: +EGP 450
+🛁 Private In-Room Jacuzzi Setup: +EGP 300
+🎮 Sony PlayStation 5 in-room console: +EGP 200
+🏛️ Licensed Tour Guide for Cairo & Pyramids Excursions: +EGP 500
+24/7 Room Service menu is also available anytime from your booking page.`
+      };
+    }
+  }
+
+  // 3. Query DB: Room types and prices
   if (
     text.includes('price') || text.includes('cost') || text.includes('rate') || 
     text.includes('room type') || text.includes('rooms') || text.includes('suite') || 
@@ -107,22 +146,36 @@ async function analyzeQuestionAndAnswer(message, guestId, lang) {
     }
   }
 
-  // 4. Query DB: Guest's own reservation and balance
-  if (
-    guestId && (
-      text.includes('my booking') || text.includes('my reservation') || text.includes('my stay') || 
-      text.includes('balance') || text.includes('bill') || text.includes('due') ||
-      text.includes('حجزي') || text.includes('حجوزاتي') || text.includes('الحساب') || text.includes('الفاتورة')
-    )
-  ) {
+  // 4. Query DB: Guest's own reservation, billing, invoice and balance
+  const bookingKeywords = [
+    'my booking', 'my reservation', 'my stay', 'balance', 'bill', 'due', 'invoice', 
+    'receipt', 'payment', 'paid', 'charges', 'statement', 'cost of stay', 'booking details',
+    'حجز', 'حجزي', 'حجوزاتي', 'الحجز', 'حجوزات', 'تفاصيل', 'فاتورة', 'فواتير', 'فواتيري', 
+    'الفاتورة', 'الفواتير', 'حساب', 'حسابي', 'الحساب', 'كشف حساب', 'فلوس', 'فلوسي', 
+    'دفع', 'دفعت', 'مدفوع', 'متبقي', 'باقي', 'المتبقي', 'الباقي', 'تكلفة', 'التكلفة', 
+    'مصاريف', 'المصاريف', 'اجمالي', 'الإجمالي', 'وصل', 'ايصال', 'إيصال', 'اخير', 'الأخير', 
+    'بتاعي', 'عليا كام', 'ادفع كام', 'استعلام'
+  ];
+  const isBookingQuery = bookingKeywords.some(kw => text.includes(kw));
+
+  if (isBookingQuery) {
+    if (!guestId) {
+      return {
+        canAnswer: true,
+        escalated: false,
+        response: isAr
+          ? 'يرجى تسجيل الدخول إلى حسابك أولاً لعرض تفاصيل حجزك وفاتورتك الشخصية.'
+          : 'Please sign in to your account first to view your booking and invoice details.'
+      };
+    }
+
     try {
       const [resRows] = await pool.query(
-        `SELECT r.reservation_id, rm.room_number, rm.type, 
+        `SELECT r.reservation_id, rm.room_number, rm.type AS room_type, rm.price_per_night,
+                DATEDIFF(r.check_out_date, r.check_in_date) AS nights,
                 DATE_FORMAT(r.check_in_date, '%Y-%m-%d') AS check_in_date,
                 DATE_FORMAT(r.check_out_date, '%Y-%m-%d') AS check_out_date,
-                r.status, r.total_price,
-                COALESCE((SELECT SUM(o.total_price) FROM room_service_order o WHERE o.reservation_id = r.reservation_id AND o.status <> 'Cancelled'), 0) AS service_total,
-                COALESCE((SELECT SUM(p.amount) FROM payment p WHERE p.reservation_id = r.reservation_id AND p.status = 'Paid'), 0) AS amount_paid
+                r.status, r.total_price AS room_total
          FROM reservation r
          JOIN room rm ON rm.room_id = r.room_id
          WHERE r.guest_id = ?
@@ -133,20 +186,126 @@ async function analyzeQuestionAndAnswer(message, guestId, lang) {
 
       if (resRows.length > 0) {
         const stay = resRows[0];
-        const grandTotal = Number((Number(stay.total_price) + Number(stay.service_total)).toFixed(2));
-        const balance = Number((grandTotal - Number(stay.amount_paid)).toFixed(2));
-        const statusNames = { Pending: 'قيد الانتظار', Confirmed: 'مؤكد', 'Checked-In': 'مقيم حالياً', 'Checked-Out': 'غادر', Completed: 'مكتمل', Cancelled: 'ملغي' };
+        const roomTotal = Number(stay.room_total) || 0;
+        const nights = stay.nights || 1;
+
+        // Fetch room service orders & add-ons for this reservation
+        const [orders] = await pool.query(
+          `SELECT order_id, items, total_price, status 
+           FROM room_service_order 
+           WHERE reservation_id = ? 
+           ORDER BY order_id ASC`,
+          [stay.reservation_id]
+        );
+
+        // Fetch payments made for this reservation
+        const [payments] = await pool.query(
+          `SELECT payment_id, amount, method, status, DATE_FORMAT(paid_at, '%Y-%m-%d %H:%i') AS paid_at, gateway_ref 
+           FROM payment 
+           WHERE reservation_id = ? 
+           ORDER BY payment_id ASC`,
+          [stay.reservation_id]
+        );
+
+        const activeOrders = orders.filter(o => o.status !== 'Cancelled');
+        const cancelledOrders = orders.filter(o => o.status === 'Cancelled');
+        const serviceTotal = activeOrders.reduce((sum, o) => sum + Number(o.total_price), 0);
+        const grandTotal = Number((roomTotal + serviceTotal).toFixed(2));
+        const amountPaid = payments.filter(p => p.status === 'Paid').reduce((sum, p) => sum + Number(p.amount), 0);
+        const balanceDue = Math.max(0, Number((grandTotal - amountPaid).toFixed(2)));
+
+        const statusNamesAr = {
+          Pending: 'قيد الانتظار',
+          Confirmed: 'مؤكد',
+          'Checked-In': 'مقيم حالياً بالفندق',
+          'Checked-Out': 'تم تسجيل المغادرة',
+          Completed: 'مكتمل',
+          Cancelled: 'ملغي'
+        };
+
+        const roomTypeNamesAr = {
+          Single: 'فردية (Single)',
+          Double: 'مزدوجة (Double)',
+          Suite: 'جناح فاخر (Suite)'
+        };
+
         if (isAr) {
+          let ordersBreakdown = '';
+          if (activeOrders.length > 0) {
+            ordersBreakdown = '\n• 🛎️ الإضافات وخدمات الغرف النشطة:\n' + 
+              activeOrders.map(o => `   - ${o.items}: ${Number(o.total_price).toFixed(2)} ج.م [${o.status === 'Delivered' ? 'تم التوصيل' : 'قيد التجهيز'}]`).join('\n');
+          } else {
+            ordersBreakdown = '\n• 🛎️ الإضافات وخدمات الغرف: لا توجد إضافات نشطة (0.00 ج.م)';
+          }
+
+          if (cancelledOrders.length > 0) {
+            ordersBreakdown += '\n• ❌ الإضافات الملغاة (تم خصمها من الحساب):\n' + 
+              cancelledOrders.map(o => `   - ${o.items}: ${Number(o.total_price).toFixed(2)} ج.م [ملغي]`).join('\n');
+          }
+
+          let paymentsInfo = '';
+          if (payments.length > 0) {
+            paymentsInfo = '\n• 💳 سجل المدفوعات:\n' + 
+              payments.map(p => `   - ${p.method === 'Online' ? 'دفع إلكتروني بالبطاقة' : p.method}: ${Number(p.amount).toFixed(2)} ج.م [${p.status === 'Paid' ? 'تم السداد بنجاح' : p.status}]`).join('\n');
+          } else {
+            paymentsInfo = '\n• 💳 سجل المدفوعات: لم يتم تسجيل مدفوعات إلكترونية بعد (الدفع عند مكتب الاستقبال)';
+          }
+
+          const responseText = 
+`🧾 تفاصيل فاتورة وحساب حجزك رقم #${stay.reservation_id}:
+🏨 الغرفة: رقم ${stay.room_number} (${roomTypeNamesAr[stay.room_type] || stay.room_type})
+📅 مدة الإقامة: من ${stay.check_in_date} إلى ${stay.check_out_date} (${nights} ${nights > 1 ? 'ليالٍ' : 'ليلة'})
+📌 حالة الحجز: [${statusNamesAr[stay.status] || stay.status}]
+
+💰 بيان التكلفة والحساب التفصيلي:
+• 🛏️ تكلفة الإقامة بالغرفة: ${roomTotal.toFixed(2)} ج.م (${stay.price_per_night} ج.م × ${nights} ليلة)${ordersBreakdown}${paymentsInfo}
+─────────────────────
+💵 إجمالي الفاتورة الكلي: ${grandTotal.toFixed(2)} ج.م
+💳 إجمالي المسدد / المدفوع: ${amountPaid.toFixed(2)} ج.م
+⚖️ المبلغ المتبقي للسداد: ${balanceDue.toFixed(2)} ج.م ${balanceDue === 0 ? '✓ (الحساب مسدد بالكامل)' : '(مستحق الدفع عند مكتب الاستقبال)'}`;
+
           return {
             canAnswer: true,
             escalated: false,
-            response: `آخر حجز لك هو رقم #${stay.reservation_id} لغرفة ${stay.room_number} (${stay.type}). التواريخ: ${stay.check_in_date} إلى ${stay.check_out_date}. الحالة: [${statusNames[stay.status] || stay.status}]. الإجمالي: ${grandTotal} ج.م، المتبقي للدفع: ${balance > 0 ? balance : 0} ج.م.`
+            response: responseText
           };
         } else {
+          let ordersBreakdown = '';
+          if (activeOrders.length > 0) {
+            ordersBreakdown = '\n• 🛎️ Active Room Service & Add-ons:\n' + 
+              activeOrders.map(o => `   - ${o.items}: EGP ${Number(o.total_price).toFixed(2)} [${o.status}]`).join('\n');
+          } else {
+            ordersBreakdown = '\n• 🛎️ Room Service & Add-ons: None (EGP 0.00)';
+          }
+
+          if (cancelledOrders.length > 0) {
+            ordersBreakdown += '\n• ❌ Cancelled Items (Deducted from Bill):\n' + 
+              cancelledOrders.map(o => `   - ${o.items} [Cancelled]`).join('\n');
+          }
+
+          let paymentsInfo = '';
+          if (payments.length > 0) {
+            paymentsInfo = '\n• 💳 Payments Made:\n' + 
+              payments.map(p => `   - ${p.method}: EGP ${Number(p.amount).toFixed(2)} [${p.status}]`).join('\n');
+          }
+
+          const responseText = 
+`🧾 Detailed Invoice & Statement for Booking #${stay.reservation_id}:
+🏨 Room: #${stay.room_number} (${stay.room_type})
+📅 Dates: ${stay.check_in_date} to ${stay.check_out_date} (${nights} night(s))
+📌 Status: [${stay.status}]
+
+💰 Financial Breakdown:
+• 🛏️ Room Accommodation: EGP ${roomTotal.toFixed(2)} (EGP ${stay.price_per_night} × ${nights} night(s))${ordersBreakdown}${paymentsInfo}
+─────────────────────
+💵 Grand Total: EGP ${grandTotal.toFixed(2)}
+💳 Total Paid: EGP ${amountPaid.toFixed(2)}
+⚖️ Balance Due: EGP ${balanceDue.toFixed(2)} ${balanceDue === 0 ? '✓ (Fully Settled)' : '(Payable at Reception/Checkout)'}`;
+
           return {
             canAnswer: true,
             escalated: false,
-            response: `Your latest booking is #${stay.reservation_id} for Room ${stay.room_number} (${stay.type}). Dates: ${stay.check_in_date} to ${stay.check_out_date}. Status: [${stay.status}]. Total: EGP ${grandTotal}, Balance due: EGP ${balance > 0 ? balance : 0}.`
+            response: responseText
           };
         }
       } else {
@@ -154,8 +313,8 @@ async function analyzeQuestionAndAnswer(message, guestId, lang) {
           canAnswer: true,
           escalated: false,
           response: isAr
-            ? 'لا توجد حجوزات مسجلة على حسابك حتى الآن. يمكنك اختيار غرفة وإجراء حجز في أي وقت!'
-            : 'You do not have any bookings registered under your account yet. You can choose a room and make a reservation anytime!'
+            ? 'لا توجد حجوزات مسجلة على حسابك حتى الآن. يمكنك اختيار غرفة وإجراء حجز في أي وقت من الصفحة الرئيسية!'
+            : 'You do not have any bookings registered under your account yet. You can choose a room and make a reservation anytime on the home page!'
         };
       }
     } catch (e) {
@@ -163,7 +322,7 @@ async function analyzeQuestionAndAnswer(message, guestId, lang) {
     }
   }
 
-  // 5. General Hotel FAQs (Check-in, Check-out, Amenities, Room Service)
+  // 6. General Hotel FAQs (Check-in, Check-out, Amenities, Room Service)
   if (text.includes('check-in time') || text.includes('check-out time') || text.includes('time') || text.includes('ميعاد') || text.includes('وقت')) {
     return {
       canAnswer: true,

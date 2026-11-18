@@ -191,6 +191,13 @@ const API = (function () {
       });
     },
 
+    async cancelOrderItem(orderId, itemIndex) {
+      return request(`/room-service/${orderId}/cancel-item`, {
+        method: 'POST',
+        body: JSON.stringify({ itemIndex })
+      });
+    },
+
     // Reviews
     async submitReview(reservationId, rating, comment) {
       return request('/reviews', {

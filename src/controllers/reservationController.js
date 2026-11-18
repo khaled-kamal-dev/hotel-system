@@ -99,32 +99,31 @@ async function createReservation(req, res) {
     );
     const reservationId = resResult.insertId;
 
-    // 5) Handle Add-ons & Meal plans as Room Service order (Jacuzzi, Sony console, Tour guide, Breakfast/Lunch)
-    let selectedItemsList = [];
+    // 5) Handle Add-ons & Meal plans as Room Service order (each add-on inserted individually so it can be cancelled individually)
     let addOnsTotal = 0;
 
     if (mealPlan && mealPlan.name && Number(mealPlan.price) > 0) {
       const mealCost = Number(mealPlan.price) * (mealPlan.perNight ? nights : 1);
-      selectedItemsList.push(`${mealPlan.name} (EGP ${mealCost})`);
       addOnsTotal += mealCost;
-    }
-
-    if (Array.isArray(addOns) && addOns.length > 0) {
-      addOns.forEach(item => {
-        const p = Number(item.price) || 0;
-        if (p > 0 && item.name) {
-          selectedItemsList.push(`${item.name} (EGP ${p})`);
-          addOnsTotal += p;
-        }
-      });
-    }
-
-    if (selectedItemsList.length > 0) {
       await connection.query(
         `INSERT INTO room_service_order (reservation_id, items, total_price, status, ordered_at)
          VALUES (?, ?, ?, 'Placed', NOW())`,
-        [reservationId, selectedItemsList.join(', '), addOnsTotal]
+        [reservationId, mealPlan.name, mealCost]
       );
+    }
+
+    if (Array.isArray(addOns) && addOns.length > 0) {
+      for (const item of addOns) {
+        const p = Number(item.price) || 0;
+        if (p > 0 && item.name) {
+          addOnsTotal += p;
+          await connection.query(
+            `INSERT INTO room_service_order (reservation_id, items, total_price, status, ordered_at)
+             VALUES (?, ?, ?, 'Placed', NOW())`,
+            [reservationId, item.name, p]
+          );
+        }
+      }
     }
 
     const grandTotalPrice = Number((roomTotalPrice + addOnsTotal).toFixed(2));

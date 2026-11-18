@@ -107,6 +107,10 @@
       confirmPayOnline: "💳 تأكيد الحجز ودفع إلكتروني الآن",
       confirmPayDesk: "🏨 تأكيد الحجز والدفع عند الوصول بالفندق",
       close: "إغلاق",
+      cancelBtn: "إلغاء",
+      cancelItem: "إلغاء الصنف",
+      showPassword: "إظهار كلمة المرور",
+      hidePassword: "إخفاء كلمة المرور",
       perNight: "في الليلة",
       once: "مرة واحدة",
       egp: "ج.م"
@@ -215,6 +219,10 @@
       confirmPayOnline: "💳 Confirm & Pay Online Now",
       confirmPayDesk: "🏨 Confirm & Pay Upon Arrival",
       close: "Close",
+      cancelBtn: "Cancel",
+      cancelItem: "Cancel Item",
+      showPassword: "Show Password",
+      hidePassword: "Hide Password",
       perNight: "per night",
       once: "per stay",
       egp: "EGP"
@@ -257,6 +265,34 @@
     Single: "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=700&q=80",
     Double: "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=700&q=80",
     Suite:  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=700&q=80"
+  };
+
+  // Curated Hotel Room Descriptions & Amenities
+  var ROOM_DESCRIPTIONS = {
+    Single: {
+      ar: 'غرفة عصرية مريحة مجهزة بسرير فاخر، مكتب عمل أنيق، شاشة ذكية وحمام رخامي خاص. مثالية للمسافرين الفرديين وإقامات العمل.',
+      en: 'A modern, comfortable room with a plush single bed, executive desk, smart TV, and private marble bath. Perfect for solo and business travelers.',
+      tags: {
+        ar: ['سرير فردي فاخر', 'مكتب عمل', 'شاشة ذكية', 'واي فاي فائق'],
+        en: ['Plush Single Bed', 'Work Desk', 'Smart TV', 'Fast Wi-Fi']
+      }
+    },
+    Double: {
+      ar: 'إطلالة مباشرة ساحرة على النيل مع سرير كينج فخم، ركن جلوس هادئ، وشرفة خاصة للاسترخاء. الخيار الأمثل للأزواج وقضاء أجمل العطلات.',
+      en: 'Stunning riverfront views featuring a plush king bed, cozy lounge area, and private balcony. The ultimate choice for couples and leisure vacations.',
+      tags: {
+        ar: ['سرير كينج مزدوج', 'إطلالة على النيل', 'شرفة خاصة', 'ركن قهوة'],
+        en: ['King Size Bed', 'Nile View', 'Private Balcony', 'Coffee Station']
+      }
+    },
+    Suite: {
+      ar: 'جناح ملكي فسيح يضم غرفة نوم ماستر، صالة استقبال ومعيشة مستقلة، حمام جاكوزي خاص، وإطلالة بانورامية على كورنيش النيل مع خدمات VIP كاملة.',
+      en: 'An opulent royal suite offering a master bedroom, separate living room, private Jacuzzi bath, and panoramic Nile Corniche views with full VIP hospitality.',
+      tags: {
+        ar: ['جناح عائلي فسيح', 'صالة استقبال', 'جاكوزي خاص', 'ضيافة VIP'],
+        en: ['Spacious Suite', 'Living Lounge', 'Private Jacuzzi', 'VIP Amenities']
+      }
+    }
   };
 
   function t(key, vars) {
@@ -440,6 +476,13 @@
 
   function roomCard(room, bookable) {
     var imgUrl = ROOM_IMAGES[room.type] || ROOM_IMAGES.Single;
+    var descObj = ROOM_DESCRIPTIONS[room.type] || ROOM_DESCRIPTIONS.Single;
+    var descText = state.lang === 'ar' ? descObj.ar : descObj.en;
+    var tags = (state.lang === 'ar' ? descObj.tags.ar : descObj.tags.en) || [];
+    var tagsHtml = tags.map(function (tg) {
+      return '<span class="room-tag">' + esc(tg) + '</span>';
+    }).join('');
+
     var action = '';
     if (bookable) {
       if (room.isAvailableForDates) {
@@ -459,6 +502,8 @@
           '<span><strong>' + money(room.price_per_night) + '</strong> / ' + t('night') + '</span>' +
           pill(room.status) +
         '</div>' +
+        '<p class="card-desc">' + descText + '</p>' +
+        '<div class="room-tags">' + tagsHtml + '</div>' +
         (room.nights ? '<p class="note">' + room.nights + ' ' + (room.nights > 1 ? t('nights') : t('night')) + ' · ' + t('total') + ': ' + money(room.totalStayPrice) + '</p>' : '') +
       '</div>' +
       action +
@@ -573,7 +618,12 @@
           '<h2 style="font-size: 1.55rem; margin-bottom: 4px;">' + heading + '</h2>' +
           registerFields +
           '<label>' + t('email') + '<input type="email" name="email" required placeholder="name@example.com"></label>' +
-          '<label>' + t('password') + '<input type="password" name="password" required minlength="4" placeholder="••••••••"></label>' +
+          '<label>' + t('password') +
+            '<div class="password-wrapper">' +
+              '<input type="password" name="password" required minlength="4" placeholder="••••••••" autocomplete="current-password">' +
+              '<button type="button" class="password-toggle-btn" data-act="toggle-password" title="' + t('showPassword') + '" aria-label="Toggle Password Visibility">👁️</button>' +
+            '</div>' +
+          '</label>' +
           '<button class="btn" type="submit" style="margin-top: 8px;">' + (isRegister ? t('register') : t('signIn')) + '</button>' +
         '</form>' +
       '</div>' +
@@ -709,18 +759,40 @@
       '</form>';
     }
 
-    var ordersHtml = stay.orders && stay.orders.length ? stay.orders.map(function (o) {
-      var cancelBtn = (user.role === 'guest' && o.status === 'Placed')
-        ? ' <button class="btn-line danger" data-act="cancel-order" data-id="' + o.order_id + '">إلغاء</button>'
-        : '';
-      var deliverBtn = (user.role === 'receptionist' && o.status === 'Placed')
-        ? ' <button class="btn-line" data-act="deliver-order" data-id="' + o.order_id + '">تم التوصيل</button>'
-        : '';
-      return '<div class="list-row">' +
-        '<span>' + esc(o.items) + ' · ' + pill(o.status) + cancelBtn + deliverBtn + '</span>' +
-        '<span>' + money(o.total_price) + '</span>' +
-      '</div>';
-    }).join('') : '<p class="note">لا توجد طلبات خدمة غرف أو إضافات.</p>';
+    var ordersHtml = '';
+    if (stay.orders && stay.orders.length) {
+      var rows = [];
+      stay.orders.forEach(function (o) {
+        var rawItems = o.items ? o.items.split(/,\s*(?=[^)]*(?:\(|$))/) : [];
+        if (rawItems.length > 1 && o.status === 'Placed') {
+          rawItems.forEach(function (it, idx) {
+            var itemCancelBtn = (user.role === 'guest')
+              ? ' <button class="btn-line danger" data-act="cancel-order-item" data-id="' + o.order_id + '" data-index="' + idx + '">' + t('cancelBtn') + '</button>'
+              : '';
+            var priceMatch = it.match(/\((?:EGP\s*)?(\d+(?:\.\d+)?)\)/i) || it.match(/(\d+(?:\.\d+)?)\s*(?:EGP|ج\.م)/i);
+            var itemPrice = priceMatch ? Number(priceMatch[1]) : Number((Number(o.total_price) / rawItems.length).toFixed(2));
+            rows.push('<div class="list-row">' +
+              '<span>' + esc(it) + ' · ' + pill(o.status) + itemCancelBtn + '</span>' +
+              '<span>' + money(itemPrice) + '</span>' +
+            '</div>');
+          });
+        } else {
+          var cancelBtn = (user.role === 'guest' && o.status === 'Placed')
+            ? ' <button class="btn-line danger" data-act="cancel-order" data-id="' + o.order_id + '">' + t('cancelBtn') + '</button>'
+            : '';
+          var deliverBtn = (user.role === 'receptionist' && o.status === 'Placed')
+            ? ' <button class="btn-line" data-act="deliver-order" data-id="' + o.order_id + '">' + (state.lang === 'ar' ? 'تم التوصيل' : 'Delivered') + '</button>'
+            : '';
+          rows.push('<div class="list-row">' +
+            '<span>' + esc(o.items) + ' · ' + pill(o.status) + cancelBtn + deliverBtn + '</span>' +
+            '<span>' + money(o.total_price) + '</span>' +
+          '</div>');
+        }
+      });
+      ordersHtml = rows.join('');
+    } else {
+      ordersHtml = '<p class="note">' + (state.lang === 'ar' ? 'لا توجد طلبات خدمة غرف أو إضافات.' : 'No room service or add-ons requested.') + '</p>';
+    }
 
     var paymentsHtml = stay.payments && stay.payments.length ? stay.payments.map(function (p) {
       return '<div class="list-row">' +
@@ -1371,12 +1443,44 @@
       return;
     }
 
+    // Toggle Password Visibility
+    var togglePwBtn = e.target.closest('[data-act="toggle-password"]');
+    if (togglePwBtn) {
+      var pwWrapper = togglePwBtn.closest('.password-wrapper');
+      if (pwWrapper) {
+        var pwInput = pwWrapper.querySelector('input');
+        if (pwInput) {
+          var isHidden = pwInput.type === 'password';
+          pwInput.type = isHidden ? 'text' : 'password';
+          togglePwBtn.innerHTML = isHidden ? '🙈' : '👁️';
+          togglePwBtn.title = isHidden ? t('hidePassword') : t('showPassword');
+          pwInput.focus();
+        }
+      }
+      return;
+    }
+
     // Mark room service delivered
     var delOrderBtn = e.target.closest('[data-act="deliver-order"]');
     if (delOrderBtn) {
       try {
         await API.updateOrderStatus(delOrderBtn.dataset.id, 'Delivered');
-        showNotice('تم توصيل الطلب.');
+        showNotice(state.lang === 'ar' ? 'تم توصيل الطلب بنجاح.' : 'Order marked as delivered.');
+        loadViewData();
+      } catch (err) {
+        showError(err.message);
+      }
+      return;
+    }
+
+    // Cancel individual room service / add-on item
+    var cancelItemBtn = e.target.closest('[data-act="cancel-order-item"]');
+    if (cancelItemBtn) {
+      try {
+        var orderId = cancelItemBtn.dataset.id;
+        var itemIndex = cancelItemBtn.dataset.index;
+        await API.cancelOrderItem(orderId, itemIndex);
+        showNotice(state.lang === 'ar' ? 'تم إلغاء الخدمة الإضافية بنجاح.' : 'Add-on service cancelled successfully.');
         loadViewData();
       } catch (err) {
         showError(err.message);
@@ -1389,7 +1493,7 @@
     if (cancelOrderBtn) {
       try {
         await API.updateOrderStatus(cancelOrderBtn.dataset.id, 'Cancelled');
-        showNotice('تم إلغاء الطلب.');
+        showNotice(state.lang === 'ar' ? 'تم إلغاء الخدمة بنجاح.' : 'Service cancelled successfully.');
         loadViewData();
       } catch (err) {
         showError(err.message);
@@ -1511,8 +1615,9 @@
         if (qty > 0) {
           var iName = inp.dataset.name;
           var iPrice = Number(inp.dataset.price);
-          selected.push(qty + 'x ' + iName);
-          total += qty * iPrice;
+          var cost = qty * iPrice;
+          selected.push({ name: qty + 'x ' + iName, price: cost });
+          total += cost;
         }
       });
 
